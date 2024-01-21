@@ -1,0 +1,543 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Mvc.RazorPages;
+@using System.Drawing
+@attribute [StreamRendering]
+@attribute [Authorize]
+@inject Data.ApplicationDbContext dbcontext
+@inject Microsoft.AspNetCore.Identity.UserManager<Data.ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@rendermode InteractiveServer
+@attribute [ValidateAntiForgeryToken]
+@inject NavigationManager navigationManager
+
+@page "/ProjectEditor/{PID}"
+
+
+<style>
+    .buttonee {
+        color: white;
+        border-color: rgba(0,0,0,0);
+        background-color: rgba(0,0,0,0);
+        border-radius: 5px;
+    }
+
+        .buttonee:hover {
+            background-color: rgba(0, 0, 0, 0.2);
+            box-shadow: 0px 0px 14px 4px rgba(0,0,0,0.2);
+        }
+
+        .buttonee div, .buttonee div div {
+            border-width: 0;
+            margin: 0;
+            padding: 5px;
+            padding-left: 30px;
+            padding-right: 30px;
+            border-radius: 5px;
+        }
+
+    .former {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        align-items: center;
+    }
+
+        .former div {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+    .horizontal {
+        justify-content: space-evenly;
+        flex-direction: row;
+    }
+
+    .submitButton {
+        background-color: inherit;
+    }
+
+        .submitButton:hover {
+            background-color: darkgreen;
+        }
+
+    .cancelButton {
+        background-color: inherit;
+    }
+
+        .cancelButton:hover {
+            background-color: red;
+        }
+
+    table {
+        border-collapse: collapse;
+        border-radius: 5px;
+    }
+
+    tr, td {
+        background-color: rgba(255, 255, 255, 0);
+        border-color: white;
+        border-width: 1px;
+    }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        td:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+</style>
+
+
+@if (Project == null || Categories == null || Rows == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div style="display: flex; flex-direction:row; ">
+        <div width="70%" style="overflow:auto;">
+            <table width="100%">
+                <thead>
+                    <tr>
+                        @foreach (Data.Category category in Categories)
+                        {
+                            <th @onclick="() => StartEditCategory(category.ColumnIndex)" style="min-width: 80px; padding-left: 20px;">@category.Name</th>
+                        }
+                        <th><button @onclick="addCategory" class="buttonee">Add Column</button></th>
+                        <th>Total Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (List<Data.Field> row in Rows)
+                    {
+                        <tr>
+                            @foreach (Data.Field field in row)
+                            {
+                                @if (field.Category.Value == 0)
+                                {
+                                    <td @onclick="() => StartEditField(field.Category.ColumnIndex, field.RowIndex)" style="background-color: dimgrey;">@field.Text</td>
+                                }
+                                else if (field.Value == -1)
+                                {
+                                    <td @onclick="() => StartEditField(field.Category.ColumnIndex, field.RowIndex)" style="background-color: darkred;">@field.Text</td>
+                                }
+                                else if (field.Value == 0)
+                                {
+                                    <td @onclick="() => StartEditField(field.Category.ColumnIndex, field.RowIndex)" style="background-color: darkgoldenrod;">@field.Text</td>
+                                }
+                                else if (field.Value == 1)
+                                {
+                                    <td @onclick="() => StartEditField(field.Category.ColumnIndex, field.RowIndex)" style="background-color: darkgreen;">@field.Text</td>
+                                }
+                                else
+                                {
+                                    <td @onclick="() => StartEditField(field.Category.ColumnIndex, field.RowIndex)" style="background-color: dimgrey;">@field.Text</td>
+                                }
+                            }
+                            <td></td>
+                            <td>@Results[row[0].RowIndex].number</td>
+                        </tr>
+                    }
+                    <tr>
+                        <td><button @onclick="addRow" class="buttonee">Add Row</button></td>
+                        @for (int i = 1; i < Categories.Count; i++)
+                        {
+                            <td></td>
+                        }
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="width: 30%; max-height: 50%;">
+            <div>
+                @if (SelectedCategory != null)
+                {
+                    <form class="former" method="post" @onsubmit="EditCategory" autocomplete="off">
+                        <h3>Category Editor</h3>
+                        <div>
+                            <label>Category Name</label>
+                            <input type="text" name="CategoryName" required @bind="SelectedCategory.Name" />
+                        </div>
+                        <div>
+                            <label>Category Value</label>
+                            <input type="number" name="CategoryValue" required @bind="SelectedCategory.Value" />
+                        </div>
+                        <div>
+                            <label>Data type</label>
+                            <select @bind="SelectedCategory.Datatype">
+                                @for (short i = 1; i < 7; i++)
+                                {
+                                    @if (SelectedCategory.Datatype == i)
+                                    {
+                                        <option selected value="@i">@dataTypeToString(i)</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@i">@dataTypeToString(i)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="horizontal">
+                            <div>
+                                <label>Success Value</label>
+                                <input type="number" name="CategoryMinimumValue" @bind="SelectedCategory.FailValue" />
+                            </div>
+                            <div>
+                                <label>Fail Value</label>
+                                <input type="number" name="CategoryMaximumValue" @bind="SelectedCategory.SuccessValue" />
+                            </div>
+                        </div>
+                        <input type="submit" value="Apply" class="buttonee submitButton" />
+                    </form>
+                }
+            </div>
+            <div>
+                @if (SelectedField != null && SelectedCategory != null)
+                {
+                    <form class="former" method="post" autocomplete="off" @onsubmit="EditField">
+                        <h3>Field Editor</h3>
+                        <div>
+                            <label>Field Text</label>
+                            @switch (SelectedCategory.Datatype)
+                            {
+                                case 1:
+                                    <input type="text" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 2:
+                                    <textarea name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 3:
+                                    <input type="text" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 4:
+                                    <input type="number" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 5:
+                                    <input type="number" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 6:
+                                    <input type="number" min="0" max="5" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                case 7:
+                                    <input type="number" min="0" max="1" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+                                default:
+                                    <input type="text" name="FieldText" required @bind="SelectedField.Text" />
+                                    break;
+
+                            }
+                        </div>
+                        <div>
+                            <label>Field Value</label>
+                            @switch (SelectedCategory.Datatype)
+                            {
+                                case 1:
+                                    <input type="number" name="FieldValue" required min="-1" max="1" @bind="SelectedField.Value" />
+                                    break;
+                                case 2:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                case 3:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                case 4:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                case 5:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                case 6:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                case 7:
+                                    <input type="number" name="FieldValue" disabled @bind="SelectedField.Value" />
+                                    break;
+                                default:
+                                    <input type="number" name="FieldValue" required min="-1" max="1" @bind="SelectedField.Value" />
+                                    break;
+                            }
+                        </div>
+                        <input type="submit" value="Apply" class="buttonee submitButton" />
+
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+}
+
+
+
+@code {
+    [Parameter]
+    public string PID { get; set; }
+
+    public Data.Project Project { get; set; }
+    public List<Data.Category> Categories { get; set; }
+    public List<List<Data.Field>> Rows { get; set; }
+    public List<Result> Results { get; set; }
+
+    public Data.Category? SelectedCategory { get; set; }
+    public Data.Field? SelectedField { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Project = dbcontext.Project.Where(x => x.ID == int.Parse(PID)).First();
+        Categories = dbcontext.Category.Where(x => x.ProjectID == int.Parse(PID)).OrderBy(x => x.ColumnIndex).ToList();
+        Rows = new List<List<Data.Field>>();
+        int rowCount = dbcontext.Field.Where(x => x.Category.ColumnIndex == 0).Count();
+        Results = new List<Result>();
+        for (int i = 0; i < rowCount; i++)
+        {
+            Rows.Add(dbcontext.Field.Where(x => x.RowIndex == i).OrderBy(x => x.Category.ColumnIndex).ToList());
+            Results.Add(new Result());
+        }
+        await CalculateResults();
+    }
+
+    public async Task addRow()
+    {
+        var toBeAdded = new List<Data.Field>();
+        var previousID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1;
+        for (int i = 0; i < Categories.Count; i++)
+        {
+            toBeAdded.Add(new Data.Field()
+                {
+                    ID = previousID + i,
+                    Text = "",
+                    Value = 0,
+                    RowIndex = Rows.Count,
+                    Category = Categories[i],
+                    CategoryID = Categories[i].ID
+                });
+        }
+        Rows.Add(toBeAdded);
+        await dbcontext.Field.AddRangeAsync(toBeAdded);
+        Results.Add(new Result(Rows.Count, 0));
+        await CalculateResults();
+    }
+
+    public async Task addCategory()
+    {
+        var toBeAdded = new Data.Category()
+            {
+                ID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1,
+                Name = "",
+                Datatype = 1,
+                Value = 0,
+                ColumnIndex = Categories.Count,
+                Project = Project,
+                ProjectID = Project.ID
+            };
+        var previousID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1;
+        Categories.Add(toBeAdded);
+        await dbcontext.Category.AddAsync(toBeAdded);
+        for (int i = 0; i < Rows.Count; i++)
+        {
+            var newRow = new Data.Field()
+                {
+                    ID = previousID + i,
+                    Text = "",
+                    Value = 0,
+                    RowIndex = i,
+                    Category = toBeAdded,
+                    CategoryID = toBeAdded.ID
+                };
+            Rows[i].Add(newRow);
+            await dbcontext.Field.AddAsync(newRow);
+        }
+        await CalculateResults();
+    }
+
+    public async Task CalculateResults()
+    {
+        foreach (Data.Category column in Categories)
+        {
+            switch ((Data.CategoryDataType)column.Datatype)
+            {
+                case Data.CategoryDataType.Rating:
+                    column.FailValue = 2;
+                    column.SuccessValue = 4;
+                    break;
+                case Data.CategoryDataType.Boolean:
+                    column.FailValue = 0;
+                    column.SuccessValue = 0;
+                    break;
+            }
+        }
+        for (int i = 0; i < Rows.Count; i++)
+        {
+            CalculateRow(i);
+        }
+        await dbcontext.SaveChangesAsync();
+    }
+
+    public void editDataType(short newDataType)
+    {
+        Categories[SelectedCategory.ColumnIndex].Datatype = newDataType;
+        CalculateResults();
+    }
+
+    public void CalculateRow(int row)
+    {
+        int output = 0;
+        foreach (Data.Field field in Rows[row])
+        {
+            switch ((Data.CategoryDataType)field.Category.Datatype)
+            {
+                case Data.CategoryDataType.General:
+                    output += field.Value * field.Category.Value;
+                    break;
+                case Data.CategoryDataType.Description:
+                    field.Value = 0;
+                    break;
+                case Data.CategoryDataType.Link:
+                    field.Value = 0;
+                    break;
+                case Data.CategoryDataType.Number:
+                    if (field.Category.FailValue < field.Category.SuccessValue)
+                    {
+                        if (int.Parse(field.Text) < field.Category.FailValue)
+                        {
+                            field.Value = -1;
+                        }
+                        else if (int.Parse(field.Text) > field.Category.SuccessValue)
+                        {
+                            field.Value = 1;
+                        }
+                        else
+                        {
+                            field.Value = 0;
+                        }
+                    }
+                    else
+                    {
+                        if (int.Parse(field.Text) < field.Category.SuccessValue)
+                        {
+                            field.Value = -1;
+                        }
+                        else if (int.Parse(field.Text) > field.Category.FailValue)
+                        {
+                            field.Value = 1;
+                        }
+                        else
+                        {
+                            field.Value = 0;
+                        }
+                    }
+                    output += field.Value * field.Category.Value;
+                    break;
+                case Data.CategoryDataType.Price:
+                    if (int.Parse(field.Text) < field.Category.SuccessValue)
+                    {
+                        field.Value = -1;
+                    }
+                    else if (int.Parse(field.Text) > field.Category.FailValue)
+                    {
+                        field.Value = 1;
+                    }
+                    else
+                    {
+                        field.Value = 0;
+                    }
+                    output += field.Value * field.Category.Value;
+                    break;
+                case Data.CategoryDataType.Rating:
+
+                    if (int.Parse(field.Text) < field.Category.FailValue)
+                    {
+                        field.Value = -1;
+                    }
+                    else if (int.Parse(field.Text) > field.Category.SuccessValue)
+                    {
+                        field.Value = 1;
+                    }
+                    else
+                    {
+                        field.Value = 0;
+                    }
+                    output += field.Value * field.Category.Value;
+                    break;
+                case Data.CategoryDataType.Boolean:
+                    if (field.Text == "0")
+                    {
+                        field.Value = -1;
+                    }
+                    else
+                    {
+                        field.Value = 1;
+                    }
+                    output += field.Value * field.Category.Value;
+                    break;
+            }
+        }
+        Results[row] = new Result(row, output);
+    }
+
+    public void StartEditCategory(int column)
+    {
+        SelectedCategory = Categories[column];
+        SelectedField = null;
+    }
+
+    public void StartEditField(int column, int row)
+    {
+        SelectedCategory = Categories[column];
+        SelectedField = Rows[row][column];
+    }
+
+    public async Task EditCategory()
+    {
+        SelectedCategory = null;
+        await CalculateResults();
+    }
+
+    public async Task EditField()
+    {
+        SelectedCategory = null;
+        SelectedField = null;
+        await CalculateResults();
+    }
+
+    public string dataTypeToString(int input)
+    {
+        switch (input)
+        {
+            case 1:
+                return "General";
+            case 2:
+                return "Description";
+            case 3:
+                return "Link";
+            case 4:
+                return "Number";
+            case 5:
+                return "Price";
+            case 6:
+                return "Rating";
+            case 7:
+                return "Boolean";
+            default:
+                return "General";
+        }
+    }
+
+    public struct Result
+    {
+        public int rowIndex;
+        public int number;
+        public Result(int inRowIndex, int inNumber)
+        {
+            rowIndex = inRowIndex;
+            number = inNumber;
+        }
+    }
+}

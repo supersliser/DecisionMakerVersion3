@@ -1,0 +1,382 @@
+﻿@page "/ProjectList"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Mvc.RazorPages;
+@using System.Drawing
+@attribute [StreamRendering]
+@attribute [Authorize]
+@inject Data.ApplicationDbContext dbcontext
+@inject Microsoft.AspNetCore.Identity.UserManager<Data.ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@rendermode InteractiveServer
+@attribute [ValidateAntiForgeryToken]
+@inject NavigationManager navigationManager
+
+<style>
+    .buttonee {
+        border-color: rgba(0,0,0,0);
+        background-color: rgba(0,0,0,0);
+        border-radius: 5px;
+    }
+
+        .buttonee:hover {
+            background-color: rgba(0, 0, 0, 0.2);
+            box-shadow: 0px 0px 14px 4px rgba(0,0,0,0.2);
+        }
+
+        .buttonee div {
+            border-width: 0;
+            margin: 0;
+            padding: 5px;
+            padding-left: 30px;
+            padding-right: 30px;
+            border-radius: 5px;
+        }
+
+    .rowee {
+        background-color: rgba(255, 255, 255, 0);
+    }
+
+        .rowee:hover {
+            background-color: rgba(0, 0, 0, 20);
+        }
+
+    .former {
+        z-index: 20;
+        width: 40%;
+        height: 70%;
+        left: 30%;
+        right: 30%;
+        top: 15%;
+        bottom: 15%;
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        background-color: white;
+        color: black;
+        border-width: 6px;
+        border-color: black;
+        border-radius: 10px;
+        box-shadow: 6px 6px 12px 0px rgba(0,0,0,0.47);
+        justify-content: space-evenly;
+        align-items: center;
+    }
+
+        .former div {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+    .horizontal {
+        justify-content: space-evenly;
+        flex-direction: row;
+    }
+
+    .submitButton {
+        background-color: inherit;
+    }
+
+        .submitButton:hover {
+            background-color: darkgreen;
+        }
+
+    .cancelButton {
+        background-color: inherit;
+    }
+
+        .cancelButton:hover {
+            background-color: red;
+        }
+
+    tr {
+        background-color: rgba(255, 255, 255, 0);
+    }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.1)
+        }
+</style>
+
+
+<PageTitle>Projects</PageTitle>
+
+<h1>Projects</h1>
+
+@if (CheckDelete)
+{
+    <div>
+        <h3>Are you sure you want to delete @dbcontext.Project.Where(x => x.ID == EditingProject).First().Name</h3>
+        <button class="buttonee" @onclick="() => deleteProject(EditingProject)"><div style="background-color:orangered">Yes Please</div></button>
+        <button class="buttonee" @onclick="cancelDeleteProject"><div>Actually, no</div></button>
+    </div>
+}
+
+@if (EditorVisible)
+{
+    <form class="former" autocomplete="off">
+        <h3>Project Editor</h3>
+        <div>
+            <label>Project Name</label>
+            <input type="text" name="ProjectName" required @bind="ProjectName" />
+        </div>
+        <div>
+            <label>Project Description</label>
+            <textarea @bind="ProjectDescription" name="ProjectDescription">@ProjectDescription</textarea>
+        </div>
+        <div>
+            <label>Colour</label>
+            <input type="color" name="ProjectColour" @bind="ProjectColour" />
+        </div>
+        <div class="horizontal">
+            <input @onclick="SubmitProject" class="buttonee submitButton" type="submit" id="ProjectFormSubmit" />
+            <input @onclick="addProjectCancelled" class="buttonee cancelButton" type="submit" value="cancel" id="ProjectFormSubmit" />
+        </div>
+    </form>
+}
+<button class="buttonee" id="addProjectButton" @onclick="addProject" style="margin: 0;border-width: 0;padding: 0;">
+    <div style="background-color: cornflowerblue;">
+        Create new project
+    </div>
+</button>
+@if (Initialising)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table" style="color: white;">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Created At</th>
+                <th>Updated At</th>
+                <th><br /></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var project in Projects)
+            {
+                <tr class="rowee" style="background: linear-gradient(90deg, rgba(0,0,0,0) 65%, rgba(@project.ColourR,@project.ColourG,@project.ColourB,1) 100%);">
+                    <td>@project.Name</td>
+                    <td>@project.Description</td>
+                    <td>@project.CreatedAt</td>
+                    <td>@project.EditedAt</td>
+                    <td>
+                        <div style="display:flex; align-items:center; justify-content:center">
+                            <button @onclick="() => openProject(project.ID)" class="buttonee">Open Project</button>
+                            <button @onclick="() => editProject(project.ID)" class="buttonee"><img src="https://cdn3.iconfinder.com/data/icons/feather-5/24/edit-512.png" alt="Edit" width="16" height="16" /></button>
+                            <button @onclick="() => startDeleteProject(project.ID)" class="buttonee"><img src="https://cdn-icons-png.flaticon.com/512/3405/3405244.png" alt="Delete" width="16" height="16" /></button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Data.Project> Projects = new List<Data.Project>();
+
+    private bool EditorVisible { get; set; }
+
+    [BindProperty]
+    public string? ProjectName { get; set; }
+    [BindProperty]
+    public string? ProjectDescription { get; set; }
+    [BindProperty]
+    public string? ProjectColour { get; set; }
+
+    private int EditingProject { get; set; }
+    private bool CheckDelete { get; set; }
+    private bool Initialising { get; set; } = true;
+
+
+
+    public async Task SubmitProject()
+    {
+        if (EditingProject == 0)
+        {
+            Data.Project temp;
+            try
+            {
+                temp = new Data.Project()
+                    {
+                        ID = dbcontext.Project.OrderBy(x => x.ID).Last().ID + 1,
+                        Name = ProjectName,
+                        Description = ProjectDescription,
+                        ColourR = stringToColour(ProjectColour).R,
+                        ColourG = stringToColour(ProjectColour).G,
+                        ColourB = stringToColour(ProjectColour).B,
+                        CreatedAt = DateTime.Now,
+                        EditedAt = DateTime.Now,
+                    };
+            }
+            catch (Exception ex)
+            {
+                temp = new Data.Project()
+                    {
+                        ID = 1,
+                        Name = ProjectName,
+                        Description = ProjectDescription,
+                        ColourR = stringToColour(ProjectColour).R,
+                        ColourG = stringToColour(ProjectColour).G,
+                        ColourB = stringToColour(ProjectColour).B,
+                        CreatedAt = DateTime.Now,
+                        EditedAt = DateTime.Now,
+                    };
+            }
+            AuthenticationState authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authenticationState.User);
+            dbcontext.Project.Add(temp);
+            var projectUser = new Data.ProjectUser()
+                {
+                    ProjectID = temp.ID,
+                    UserID = user.Id,
+                    Project = temp,
+                    AspNetUsers = user
+                };
+            dbcontext.ProjectUser.Add(projectUser);
+            Data.Category cat;
+            try
+            {
+                cat = new Data.Category()
+                    {
+                        Datatype = (short)Data.CategoryDataType.General,
+                        ColumnIndex = 0,
+                        Name = "Unnamed Category",
+                        Value = 0,
+                        ProjectID = temp.ID,
+                        ID = dbcontext.Category.OrderBy(x => x.ID).Last().ID + 1,
+                    };
+            }
+            catch (Exception ex)
+            {
+                cat = new Data.Category()
+                    {
+                        Datatype = (short)Data.CategoryDataType.General,
+                        ColumnIndex = 0,
+                        Name = "Unnamed Category",
+                        Value = 0,
+                        ProjectID = temp.ID,
+                        ID = 1,
+                    };
+            }
+            dbcontext.Category.Add(cat);
+            try
+            {
+                dbcontext.Field.Add(new Data.Field()
+                    {
+                        Text = "Blank Value",
+                        Value = 0,
+                        CategoryID = cat.ID,
+                        RowIndex = 0,
+                        ID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1,
+                    });
+            }
+            catch (Exception ex)
+            {
+                dbcontext.Field.Add(new Data.Field()
+                    {
+                        Text = "Blank Value",
+                        Value = 0,
+                        CategoryID = cat.ID,
+                        RowIndex = 0,
+                        ID = 1,
+                    });
+            }
+
+        }
+        else
+        {
+            var temp = dbcontext.Project.Where(x => x.ID == EditingProject).First();
+            temp.Name = ProjectName;
+            temp.Description = ProjectDescription;
+            temp.ColourR = stringToColour(ProjectColour).R;
+            temp.ColourG = stringToColour(ProjectColour).G;
+            temp.ColourB = stringToColour(ProjectColour).B;
+            temp.EditedAt = DateTime.Now;
+        }
+        dbcontext.SaveChanges();
+        EditorVisible = false;
+        await RefreshTable();
+    }
+
+    public Color stringToColour(string input)
+    {
+        input = input.Substring(1);
+        return Color.FromArgb(int.Parse(input.Substring(0, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(input.Substring(2, 2), System.Globalization.NumberStyles.HexNumber), int.Parse(input.Substring(4, 2), System.Globalization.NumberStyles.HexNumber));
+    }
+
+    public string colourToString(Color input)
+    {
+        return "#" + input.R.ToString() + input.G.ToString() + input.B.ToString();
+    }
+
+    public async Task RefreshTable()
+    {
+        Initialising = true;
+        AuthenticationState authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authenticationState.User);
+        Projects = dbcontext.Project
+        .Where(a => a.projectUsers
+        .Any(b => b.AspNetUsers.Id == user.Id))
+        .ToList();
+        Initialising = false;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshTable();
+    }
+
+    public void addProject()
+    {
+        EditorVisible = true;
+        EditingProject = 0;
+    }
+
+    public void addProjectCancelled()
+    {
+        EditorVisible = false;
+        EditingProject = 0;
+    }
+
+    public void editProject(int id)
+    {
+        EditingProject = id;
+        var project = dbcontext.Project.Where(x => x.ID == id).First();
+        ProjectName = project.Name;
+        ProjectDescription = project.Description;
+        ProjectColour = colourToString(Color.FromArgb(project.ColourR, project.ColourG, project.ColourB));
+        EditorVisible = true;
+    }
+
+    public void startDeleteProject(int id)
+    {
+        EditingProject = id;
+        CheckDelete = true;
+    }
+
+    public async Task deleteProject(int id)
+    {
+        CheckDelete = false;
+        await dbcontext.Project.Where(x => x.ID == id).ExecuteDeleteAsync();
+        await RefreshTable();
+    }
+
+    public void cancelDeleteProject()
+    {
+        EditingProject = 0;
+        CheckDelete = false;
+    }
+
+    public void openProject(int id)
+    {
+        navigationManager.NavigateTo("./ProjectEditor/" + id.ToString());
+    }
+}
