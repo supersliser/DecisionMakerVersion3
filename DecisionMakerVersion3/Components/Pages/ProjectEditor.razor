@@ -171,7 +171,7 @@ else
                         <div>
                             <label>Data type</label>
                             <select @onchange="editDataType">
-                                @for (short i = 1; i < 7; i++)
+                                @for (short i = 1; i <= 7; i++)
                                 {
                                     @if (SelectedCategory.Datatype == i)
                                     {
@@ -187,11 +187,11 @@ else
                         <div class="horizontal">
                             <div>
                                 <label>Success Value</label>
-                                <input type="number" name="CategoryMinimumValue" @bind="SelectedCategory.FailValue" />
+                                <input type="number" name="CategoryMinimumValue" @bind="SelectedCategory.SuccessValue" />
                             </div>
                             <div>
                                 <label>Fail Value</label>
-                                <input type="number" name="CategoryMaximumValue" @bind="SelectedCategory.SuccessValue" />
+                                <input type="number" name="CategoryMaximumValue" @bind="SelectedCategory.FailValue" />
                             </div>
                         </div>
                         <input type="submit" value="Apply" class="buttonee submitButton" />
@@ -389,22 +389,72 @@ else
     public void CalculateRow(int row)
     {
         int output = 0;
-        foreach (Data.Field field in Rows[row])
+        try
         {
-            switch ((Data.CategoryDataType)field.Category.Datatype)
+
+            foreach (Data.Field field in Rows[row])
             {
-                case Data.CategoryDataType.General:
-                    output += field.Value * field.Category.Value;
-                    break;
-                case Data.CategoryDataType.Description:
-                    field.Value = 0;
-                    break;
-                case Data.CategoryDataType.Link:
-                    field.Value = 0;
-                    break;
-                case Data.CategoryDataType.Number:
-                    if (field.Category.FailValue < field.Category.SuccessValue)
-                    {
+                switch ((Data.CategoryDataType)field.Category.Datatype)
+                {
+                    case Data.CategoryDataType.General:
+                        output += field.Value * field.Category.Value;
+                        break;
+                    case Data.CategoryDataType.Description:
+                        field.Value = 0;
+                        break;
+                    case Data.CategoryDataType.Link:
+                        field.Value = 0;
+                        break;
+                    case Data.CategoryDataType.Number:
+                        if (field.Category.FailValue < field.Category.SuccessValue)
+                        {
+                            if (int.Parse(field.Text) < field.Category.FailValue)
+                            {
+                                field.Value = -1;
+                            }
+                            else if (int.Parse(field.Text) > field.Category.SuccessValue)
+                            {
+                                field.Value = 1;
+                            }
+                            else
+                            {
+                                field.Value = 0;
+                            }
+                        }
+                        else
+                        {
+                            if (int.Parse(field.Text) < field.Category.SuccessValue)
+                            {
+                                field.Value = 1;
+                            }
+                            else if (int.Parse(field.Text) > field.Category.FailValue)
+                            {
+                                field.Value = -1;
+                            }
+                            else
+                            {
+                                field.Value = 0;
+                            }
+                        }
+                        output += field.Value * field.Category.Value;
+                        break;
+                    case Data.CategoryDataType.Price:
+                        if (int.Parse(field.Text) < field.Category.SuccessValue)
+                        {
+                            field.Value = 1;
+                        }
+                        else if (int.Parse(field.Text) > field.Category.FailValue)
+                        {
+                            field.Value = -1;
+                        }
+                        else
+                        {
+                            field.Value = 0;
+                        }
+                        output += field.Value * field.Category.Value;
+                        break;
+                    case Data.CategoryDataType.Rating:
+
                         if (int.Parse(field.Text) < field.Category.FailValue)
                         {
                             field.Value = -1;
@@ -417,69 +467,24 @@ else
                         {
                             field.Value = 0;
                         }
-                    }
-                    else
-                    {
-                        if (int.Parse(field.Text) < field.Category.SuccessValue)
+                        output += field.Value * field.Category.Value;
+                        break;
+                    case Data.CategoryDataType.Boolean:
+                        if (field.Text == "0")
                         {
                             field.Value = -1;
                         }
-                        else if (int.Parse(field.Text) > field.Category.FailValue)
+                        else
                         {
                             field.Value = 1;
                         }
-                        else
-                        {
-                            field.Value = 0;
-                        }
-                    }
-                    output += field.Value * field.Category.Value;
-                    break;
-                case Data.CategoryDataType.Price:
-                    if (int.Parse(field.Text) < field.Category.SuccessValue)
-                    {
-                        field.Value = -1;
-                    }
-                    else if (int.Parse(field.Text) > field.Category.FailValue)
-                    {
-                        field.Value = 1;
-                    }
-                    else
-                    {
-                        field.Value = 0;
-                    }
-                    output += field.Value * field.Category.Value;
-                    break;
-                case Data.CategoryDataType.Rating:
-
-                    if (int.Parse(field.Text) < field.Category.FailValue)
-                    {
-                        field.Value = -1;
-                    }
-                    else if (int.Parse(field.Text) > field.Category.SuccessValue)
-                    {
-                        field.Value = 1;
-                    }
-                    else
-                    {
-                        field.Value = 0;
-                    }
-                    output += field.Value * field.Category.Value;
-                    break;
-                case Data.CategoryDataType.Boolean:
-                    if (field.Text == "0")
-                    {
-                        field.Value = -1;
-                    }
-                    else
-                    {
-                        field.Value = 1;
-                    }
-                    output += field.Value * field.Category.Value;
-                    break;
+                        output += field.Value * field.Category.Value;
+                        break;
+                }
             }
+            Results[row] = new Result(row, output);
         }
-        Results[row] = new Result(row, output);
+        catch (Exception ex) { }
     }
 
     public void StartEditCategory(int column)
