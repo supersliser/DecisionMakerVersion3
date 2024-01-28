@@ -170,7 +170,7 @@ else
                         </div>
                         <div>
                             <label>Data type</label>
-                            <select @bind="SelectedCategory.Datatype">
+                            <select @onchange="editDataType">
                                 @for (short i = 1; i < 7; i++)
                                 {
                                     @if (SelectedCategory.Datatype == i)
@@ -287,17 +287,18 @@ else
 
     public Data.Category? SelectedCategory { get; set; }
     public Data.Field? SelectedField { get; set; }
+    public short TempDataType { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         Project = dbcontext.Project.Where(x => x.ID == int.Parse(PID)).First();
         Categories = dbcontext.Category.Where(x => x.ProjectID == int.Parse(PID)).OrderBy(x => x.ColumnIndex).ToList();
         Rows = new List<List<Data.Field>>();
-        int rowCount = dbcontext.Field.Where(x => x.Category.ColumnIndex == 0).Count();
+        int rowCount = dbcontext.Field.Where(x => x.Category.ColumnIndex == 0).Where(x => x.Category.ProjectID == Project.ID).Count();
         Results = new List<Result>();
         for (int i = 0; i < rowCount; i++)
         {
-            Rows.Add(dbcontext.Field.Where(x => x.RowIndex == i).OrderBy(x => x.Category.ColumnIndex).ToList());
+            Rows.Add(dbcontext.Field.Where(x => x.RowIndex == i).Where(x => x.Category.ProjectID == Project.ID).OrderBy(x => x.Category.ColumnIndex).ToList());
             Results.Add(new Result());
         }
         await CalculateResults();
@@ -380,10 +381,9 @@ else
         await dbcontext.SaveChangesAsync();
     }
 
-    public void editDataType(short newDataType)
+    public async Task editDataType(ChangeEventArgs e)
     {
-        Categories[SelectedCategory.ColumnIndex].Datatype = newDataType;
-        CalculateResults();
+        SelectedCategory.Datatype = short.Parse(e.Value.ToString());
     }
 
     public void CalculateRow(int row)

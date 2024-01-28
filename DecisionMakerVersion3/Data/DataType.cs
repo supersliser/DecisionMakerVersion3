@@ -3,11 +3,11 @@
     public enum CategoryDataType
     {
         General = 1,
-        Description,
-        Link,
-        Number,
-        Price,
-        Rating,
-        Boolean
+        Description = 2,
+        Link = 3,
+        Number = 4,
+        Price = 5,
+        Rating = 6,
+        Boolean = 7
     }
 }

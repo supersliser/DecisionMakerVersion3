@@ -202,34 +202,17 @@ else
         if (EditingProject == 0)
         {
             Data.Project temp;
-            try
-            {
-                temp = new Data.Project()
-                    {
-                        ID = dbcontext.Project.OrderBy(x => x.ID).Last().ID + 1,
-                        Name = ProjectName,
-                        Description = ProjectDescription,
-                        ColourR = stringToColour(ProjectColour).R,
-                        ColourG = stringToColour(ProjectColour).G,
-                        ColourB = stringToColour(ProjectColour).B,
-                        CreatedAt = DateTime.Now,
-                        EditedAt = DateTime.Now,
-                    };
-            }
-            catch (Exception ex)
-            {
-                temp = new Data.Project()
-                    {
-                        ID = 1,
-                        Name = ProjectName,
-                        Description = ProjectDescription,
-                        ColourR = stringToColour(ProjectColour).R,
-                        ColourG = stringToColour(ProjectColour).G,
-                        ColourB = stringToColour(ProjectColour).B,
-                        CreatedAt = DateTime.Now,
-                        EditedAt = DateTime.Now,
-                    };
-            }
+            temp = new Data.Project()
+                {
+                    ID = dbcontext.Project.OrderBy(x => x.ID).Last().ID + 1,
+                    Name = ProjectName,
+                    Description = ProjectDescription,
+                    ColourR = stringToColour(ProjectColour).R,
+                    ColourG = stringToColour(ProjectColour).G,
+                    ColourB = stringToColour(ProjectColour).B,
+                    CreatedAt = DateTime.Now,
+                    EditedAt = DateTime.Now,
+                };
             AuthenticationState authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var user = await UserManager.GetUserAsync(authenticationState.User);
             dbcontext.Project.Add(temp);
@@ -242,54 +225,24 @@ else
                 };
             dbcontext.ProjectUser.Add(projectUser);
             Data.Category cat;
-            try
-            {
-                cat = new Data.Category()
-                    {
-                        Datatype = (short)Data.CategoryDataType.General,
-                        ColumnIndex = 0,
-                        Name = "Unnamed Category",
-                        Value = 0,
-                        ProjectID = temp.ID,
-                        ID = dbcontext.Category.OrderBy(x => x.ID).Last().ID + 1,
-                    };
-            }
-            catch (Exception ex)
-            {
-                cat = new Data.Category()
-                    {
-                        Datatype = (short)Data.CategoryDataType.General,
-                        ColumnIndex = 0,
-                        Name = "Unnamed Category",
-                        Value = 0,
-                        ProjectID = temp.ID,
-                        ID = 1,
-                    };
-            }
+            cat = new Data.Category()
+                {
+                    Datatype = (short)Data.CategoryDataType.General,
+                    ColumnIndex = 0,
+                    Name = "Unnamed Category",
+                    Value = 0,
+                    ProjectID = temp.ID,
+                    ID = dbcontext.Category.OrderBy(x => x.ID).Last().ID + 1,
+                };
             dbcontext.Category.Add(cat);
-            try
-            {
-                dbcontext.Field.Add(new Data.Field()
-                    {
-                        Text = "Blank Value",
-                        Value = 0,
-                        CategoryID = cat.ID,
-                        RowIndex = 0,
-                        ID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1,
-                    });
-            }
-            catch (Exception ex)
-            {
-                dbcontext.Field.Add(new Data.Field()
-                    {
-                        Text = "Blank Value",
-                        Value = 0,
-                        CategoryID = cat.ID,
-                        RowIndex = 0,
-                        ID = 1,
-                    });
-            }
-
+            dbcontext.Field.Add(new Data.Field()
+                {
+                    Text = "Blank Value",
+                    Value = 0,
+                    CategoryID = cat.ID,
+                    RowIndex = 0,
+                    ID = dbcontext.Field.OrderBy(x => x.ID).Last().ID + 1,
+                });
         }
         else
         {
@@ -365,6 +318,8 @@ else
     public async Task deleteProject(int id)
     {
         CheckDelete = false;
+        await dbcontext.Field.Where(x => x.Category.Project.ID == id).ExecuteDeleteAsync();
+        await dbcontext.Category.Where(x => x.Project.ID == id).ExecuteDeleteAsync();
         await dbcontext.Project.Where(x => x.ID == id).ExecuteDeleteAsync();
         await RefreshTable();
     }
